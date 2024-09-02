@@ -278,7 +278,15 @@ if(openPMD_USE_INTERNAL_TOML11)
     add_subdirectory("${openPMD_SOURCE_DIR}/share/openPMD/thirdParty/toml11")
     message(STATUS "toml11: Using INTERNAL version '3.7.1'")
 else()
-    find_package(toml11 3.7.1 CONFIG REQUIRED)
+    # toml11 4.0 was a breaking change. This is reflected in the library's CMake
+    # logic: version 4.0 is not accepted by a call to find_package(toml11 3.7).
+    # Since we support both incompatible versions, we use two find_package()
+    # calls. Search for version 4 first in order to prefer that
+    # in (the unlikely) case that both versions are installed.
+    find_package(toml11 4.0 CONFIG QUIET)
+    if(NOT toml11_FOUND)
+        find_package(toml11 3.7.1 CONFIG REQUIRED)
+    endif()
     message(STATUS "toml11: Found version '${toml11_VERSION}'")
 endif()
 add_library(openPMD::thirdparty::toml11 INTERFACE IMPORTED)
@@ -408,9 +416,9 @@ if(openPMD_USE_PYTHON STREQUAL AUTO)
         if(openPMD_USE_INTERNAL_PYBIND11)
             add_subdirectory("${openPMD_SOURCE_DIR}/share/openPMD/thirdParty/pybind11")
             set(openPMD_HAVE_PYTHON TRUE)
-            message(STATUS "pybind11: Using INTERNAL version 2.11.1")
+            message(STATUS "pybind11: Using INTERNAL version 2.12.0")
         else()
-            find_package(pybind11 2.11.1 CONFIG)
+            find_package(pybind11 2.12.0 CONFIG)
             if(pybind11_FOUND)
                 set(openPMD_HAVE_PYTHON TRUE)
                 message(STATUS "pybind11: Found version '${pybind11_VERSION}'")
@@ -426,9 +434,9 @@ elseif(openPMD_USE_PYTHON)
     if(openPMD_USE_INTERNAL_PYBIND11)
         add_subdirectory("${openPMD_SOURCE_DIR}/share/openPMD/thirdParty/pybind11")
         set(openPMD_HAVE_PYTHON TRUE)
-        message(STATUS "pybind11: Using INTERNAL version 2.11.1")
+        message(STATUS "pybind11: Using INTERNAL version 2.12.0")
     else()
-        find_package(pybind11 2.11.1 REQUIRED CONFIG)
+        find_package(pybind11 2.12.0 REQUIRED CONFIG)
         set(openPMD_HAVE_PYTHON TRUE)
         message(STATUS "pybind11: Found version '${pybind11_VERSION}'")
     endif()
@@ -460,6 +468,7 @@ set(CORE_SOURCE
         src/auxiliary/Date.cpp
         src/auxiliary/Filesystem.cpp
         src/auxiliary/JSON.cpp
+        src/auxiliary/Mpi.cpp
         src/backend/Attributable.cpp
         src/backend/BaseRecordComponent.cpp
         src/backend/MeshRecordComponent.cpp
@@ -482,6 +491,7 @@ set(IO_SOURCE
         src/IO/JSON/JSONIOHandlerImpl.cpp
         src/IO/JSON/JSONFilePosition.cpp
         src/IO/ADIOS/ADIOS2IOHandler.cpp
+        src/IO/ADIOS/ADIOS2File.cpp
         src/IO/ADIOS/ADIOS2Auxiliary.cpp
         src/IO/InvalidatableFile.cpp)
 
@@ -1369,7 +1379,7 @@ if(openPMD_BUILD_TESTING)
                             --outfile                                              \
                                 ../samples/git-sample/thetaMode/data_%T.bp &&      \
                                                                                    \
-                        ${Python_EXECUTABLE}                                       \
+                        ${MPI_TEST_EXE} ${Python_EXECUTABLE}                       \
                             ${openPMD_RUNTIME_OUTPUT_DIRECTORY}/openpmd-pipe       \
                             --infile ../samples/git-sample/thetaMode/data_%T.bp    \
                             --outfile ../samples/git-sample/thetaMode/data%T.json  \
